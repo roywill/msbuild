@@ -6,6 +6,7 @@
 //-----------------------------------------------------------------------
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Xml;
 using Microsoft.Build.Internal;
@@ -45,10 +46,14 @@ namespace Microsoft.Build.Construction
         private IXmlLineInfo _reader;
 
         /// <summary>
-        /// Path to the file loaded, if any, otherwise null.
-        /// Easier to intercept and store than to derive it from the XmlDocument.BaseUri property.
+        /// Advanced reader we've hooked.
         /// </summary>
-        private string _fullPath;
+        private XmlReaderWithSpan _readerExt;
+
+        /// <summary>
+        /// Elements in progress stack.
+        /// </summary>
+        private Stack<XmlElementWithLocation> _partialElements;
 
         /// <summary>
         /// Local cache of strings for attribute values and comments. Used for testing.
@@ -112,11 +117,7 @@ namespace Microsoft.Build.Construction
         /// that path, the setter here should be called when the project is given a path.
         /// It may be set to null.
         /// </summary>
-        internal string FullPath
-        {
-            get { return _fullPath; }
-            set { _fullPath = value; }
-        }
+        internal string FullPath { get; set; }
 
         /// <summary>
         /// Sets or gets the string cache used by this XmlDocument.
@@ -150,9 +151,27 @@ namespace Microsoft.Build.Construction
             // we've been given.
             _reader = reader as IXmlLineInfo;
 
+            _readerExt = reader as XmlReaderWithSpan;
+            if (_readerExt != null)
+            {
+                if (_reader == null)
+                {
+                    throw new InvalidProgramException("Don't expect this.");
+                }
+                _readerExt.NodeComplete += Complete;
+                _partialElements = new Stack<XmlElementWithLocation>();
+            }
+
             // This call results in calls to our CreateElement and CreateAttribute methods,
             // which use this.reader within themselves.
             base.Load(reader);
+
+            if (_readerExt != null)
+            {
+                _readerExt.NodeComplete -= Complete;
+                _readerExt = null;
+                _partialElements = null;
+            }
 
             // After load, the reader is no use for location information; it isn't updated when
             // the document is edited. So null it out, so that elements and attributes created by subsequent
@@ -168,7 +187,7 @@ namespace Microsoft.Build.Construction
         {
             DetermineWhetherToLoadReadOnly(fullPath);
 
-            _fullPath = fullPath;
+            FullPath = fullPath;
 
             using(var xtr = XmlReaderExtension.Create(fullPath))
             {
@@ -185,13 +204,25 @@ namespace Microsoft.Build.Construction
         /// </remarks>
         public override XmlElement CreateElement(string prefix, string localName, string namespaceURI)
         {
-            if (_reader != null)
+            if (_reader == null)
             {
-                return new XmlElementWithLocation(prefix, localName, namespaceURI, this, _reader.LineNumber, _reader.LinePosition);
+                // Must be a subsequent edit; we can't provide location information
+                return new XmlElementWithLocation(prefix, localName, namespaceURI, this);
             }
 
-            // Must be a subsequent edit; we can't provide location information
-            return new XmlElementWithLocation(prefix, localName, namespaceURI, this);
+            var temp = new XmlElementWithLocation(prefix, localName, namespaceURI, this, _reader.LineNumber, _reader.LinePosition);
+            if (_readerExt != null)
+            {
+                temp.EndLineNumber = this._readerExt.CurrentLineNumber;
+                temp.EndLinePosition = this._readerExt.CurrentLinePosition;
+
+                if (!this._readerExt.IsEmptyElement)
+                {
+                    _partialElements.Push(temp);
+                }
+            }
+
+            return temp;
         }
 
         /// <summary>
@@ -202,13 +233,20 @@ namespace Microsoft.Build.Construction
         /// </remarks>
         public override XmlAttribute CreateAttribute(string prefix, string localName, string namespaceURI)
         {
-            if (_reader != null)
+            if (_reader == null)
             {
-                return new XmlAttributeWithLocation(prefix, localName, namespaceURI, this, _reader.LineNumber, _reader.LinePosition);
+                // Must be a subsequent edit; we can't provide location information
+                return new XmlAttributeWithLocation(prefix, localName, namespaceURI, this);
             }
 
-            // Must be a subsequent edit; we can't provide location information
-            return new XmlAttributeWithLocation(prefix, localName, namespaceURI, this);
+            var temp = new XmlAttributeWithLocation(prefix, localName, namespaceURI, this, _reader.LineNumber, _reader.LinePosition);
+            if (_readerExt != null)
+            {
+                temp.EndLineNumber = _readerExt.CurrentLineNumber;
+                temp.EndLinePosition = _readerExt.CurrentLinePosition;
+            }
+
+            return temp;
         }
 
         /// <summary>
@@ -409,7 +447,27 @@ namespace Microsoft.Build.Construction
         /// </summary>
         private void VerifyThrowNotReadOnly()
         {
-            ErrorUtilities.VerifyThrowInvalidOperation(!_loadAsReadOnly.HasValue || !_loadAsReadOnly.Value, "OM_CannotSaveFileLoadedAsReadOnly", _fullPath);
+            ErrorUtilities.VerifyThrowInvalidOperation(!_loadAsReadOnly.HasValue || !_loadAsReadOnly.Value, "OM_CannotSaveFileLoadedAsReadOnly", FullPath);
+        }
+
+        /// <summary>
+        /// Callback used to update the ending location of an element.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e">Event arguments that contain the ending line number and position within the line.</param>
+        private void Complete(object sender, XmlReaderWithSpan.EndElementEventArgs e)
+        {
+            var name = e.Name;
+
+            var element = _partialElements.Pop();
+
+            if (!string.Equals(element.Name, name, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Stack out of whack");
+            }
+
+            element.EndLineNumber = e.EndLine;
+            element.EndLinePosition = e.EndLineOffset;
         }
     }
 }

@@ -653,6 +653,7 @@
       <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
     </Compile>
     <Compile Include="Xml\XmlReaderExtension.cs" />
+    <Compile Include="Xml\XmlReaderWithSpan.cs" />
     <Compile Include="..\Shared\AssemblyLoadInfo.cs">
       <Link>SharedUtilities\AssemblyLoadInfo.cs</Link>
       <ExcludeFromStyleCop>true</ExcludeFromStyleCop>
@@ -723,6 +724,9 @@
     </Compile>
     <Compile Include="..\Shared\InternalErrorException.cs">
       <Link>Errors\InternalErrorException.cs</Link>
+    </Compile>
+    <Compile Include="..\Shared\IXmlLineSpanInfo.cs">
+      <Link>SharedUtilities\IXmlLineSpanInfo.cs</Link>
     </Compile>
     <Compile Include="..\Shared\LoadedType.cs">
       <Link>SharedUtilities\LoadedType.cs</Link>

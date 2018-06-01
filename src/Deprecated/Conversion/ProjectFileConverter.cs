@@ -3054,7 +3054,7 @@ namespace Microsoft.Build.Conversion
             // anyway, so we can emit a useful error message.
             foreach (XmlAttributeWithLocation importAttribute in importElement.Attributes)
             {
-                ProjectErrorUtilities.VerifyThrowInvalidProject(false, importAttribute.Location, "UnrecognizedAttribute",
+                ProjectErrorUtilities.VerifyThrowInvalidProject(false, importAttribute.GetLocation(), "UnrecognizedAttribute",
                     importAttribute.Name, VSProjectElements.import);
             }
 
@@ -3648,7 +3648,7 @@ namespace Microsoft.Build.Conversion
             // anyway, so we can emit a useful error message.
             foreach (XmlAttributeWithLocation serviceAttribute in serviceElement.Attributes)
             {
-                ProjectErrorUtilities.VerifyThrowInvalidProject(false, serviceAttribute.Location, "UnrecognizedAttribute",
+                ProjectErrorUtilities.VerifyThrowInvalidProject(false, serviceAttribute.GetLocation(), "UnrecognizedAttribute",
                     serviceAttribute.Name, VSProjectElements.service);
             }
 

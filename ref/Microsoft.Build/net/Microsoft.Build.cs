@@ -1579,3 +1579,11 @@ namespace Microsoft.Build.Logging
     }
     public delegate void WriteHandler(string message);
 }
+namespace Microsoft.Build.Shared
+{
+    public partial interface IXmlLineSpanInfo : System.Xml.IXmlLineInfo
+    {
+        int EndLineNumber { get; }
+        int EndLinePosition { get; }
+    }
+}

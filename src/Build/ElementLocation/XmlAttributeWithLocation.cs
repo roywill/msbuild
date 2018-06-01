@@ -15,18 +15,15 @@ namespace Microsoft.Build.Construction
     /// <summary>
     /// Derivation of XmlAttribute to implement IXmlLineInfo
     /// </summary>
-    internal class XmlAttributeWithLocation : XmlAttribute, IXmlLineInfo
+    internal class XmlAttributeWithLocation : XmlAttribute, IXmlLineSpanInfo
     {
-        /// <summary>
-        /// Line, column, file information
-        /// </summary>
-        private ElementLocation _elementLocation;
+        WeakReference<ElementLocation> _elementLocation = new WeakReference<ElementLocation>(null);
 
         /// <summary>
         /// Constructor without location information
         /// </summary>
         public XmlAttributeWithLocation(string prefix, string localName, string namespaceURI, XmlDocument document)
-            : this(prefix, localName, namespaceURI, document, 0, 0)
+            : base(prefix, localName, namespaceURI, document)
         {
         }
 
@@ -34,34 +31,50 @@ namespace Microsoft.Build.Construction
         /// Constructor with location information
         /// </summary>
         public XmlAttributeWithLocation(string prefix, string localName, string namespaceURI, XmlDocument document, int lineNumber, int columnNumber)
-            : base(prefix, localName, namespaceURI, document)
+            : this(prefix, localName, namespaceURI, document)
         {
-            XmlDocumentWithLocation documentWithLocation = (XmlDocumentWithLocation)document;
-
-            _elementLocation = ElementLocation.Create(documentWithLocation.FullPath, lineNumber, columnNumber);
+            this.LineNumber = lineNumber;
+            this.LinePosition = columnNumber;
+            this.EndLineNumber = lineNumber;
+            this.EndLinePosition = columnNumber;
         }
 
-        /// <summary>
-        /// Returns the line number if available, else 0.
-        /// IXmlLineInfo member.
-        /// </summary>
+        #region IXmlLineSpanInfo
+        #region IXmlLineInfo implementation
+        /// <inheritdoc />
         public int LineNumber
         {
-            [DebuggerStepThrough]
-            get
-            { return Location.Line; }
+            get;
         }
 
-        /// <summary>
-        /// Returns the column number if available, else 0.
-        /// IXmlLineInfo member.
-        /// </summary>
+        /// <inheritdoc />
         public int LinePosition
         {
-            [DebuggerStepThrough]
-            get
-            { return Location.Column; }
+            get;
         }
+
+        /// <inheritdoc />
+        public bool HasLineInfo()
+        {
+            return LineNumber != 0;
+        }
+        #endregion
+
+        /// <inheritdoc />
+        public int EndLineNumber
+        {
+            get;
+            set;
+        }
+
+        /// <inheritdoc />
+        public int EndLinePosition
+        {
+            get;
+            set;
+        }
+
+        #endregion
 
         /// <summary>
         /// Provides an ElementLocation for this attribute.
@@ -71,28 +84,17 @@ namespace Microsoft.Build.Construction
         /// even if it wasn't loaded from disk, or has been edited since. That's because we set that
         /// path on our XmlDocumentWithLocation wrapper class.
         /// </remarks>
-        internal ElementLocation Location
+        internal ElementLocation GetLocation()
         {
-            get
+            var fullPath = ((XmlDocumentWithLocation)OwnerDocument).FullPath;
+
+            if (!_elementLocation.TryGetTarget(out ElementLocation location) || !string.Equals(location.File, fullPath, StringComparison.OrdinalIgnoreCase))
             {
-                // Caching the element location object saves significant memory
-                XmlDocumentWithLocation ownerDocumentWithLocation = (XmlDocumentWithLocation)OwnerDocument;
-                if (!String.Equals(_elementLocation.File, ownerDocumentWithLocation.FullPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    _elementLocation = ElementLocation.Create(ownerDocumentWithLocation.FullPath, _elementLocation.Line, _elementLocation.Column);
-                }
-
-                return _elementLocation;
+                location = ElementLocation.Create(fullPath, LineNumber, LinePosition);
+                _elementLocation.SetTarget(location);
             }
-        }
 
-        /// <summary>
-        /// Whether location is available.
-        /// IXmlLineInfo member.
-        /// </summary>
-        public bool HasLineInfo()
-        {
-            return Location.Line != 0;
+            return location;
         }
     }
 }

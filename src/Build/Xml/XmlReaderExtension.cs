@@ -78,7 +78,7 @@ namespace Microsoft.Build.Internal
         {
             string uri = new UriBuilder(Uri.UriSchemeFile, string.Empty) { Path = file }.ToString();
 #if FEATURE_XMLTEXTREADER
-            var reader = new XmlTextReader(uri, input) { DtdProcessing = DtdProcessing.Ignore };
+            var reader = new XmlReaderWithSpan(uri, input) { DtdProcessing = DtdProcessing.Ignore };
 
             reader.Read();
             encoding = input.CurrentEncoding;

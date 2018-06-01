@@ -344,7 +344,7 @@ namespace Microsoft.Build.Construction
             if (exclusiveAttributeCount > 1)
             {
                 XmlAttributeWithLocation errorAttribute = remove.Length > 0 ? (XmlAttributeWithLocation)element.Attributes[XMakeAttributes.remove] : (XmlAttributeWithLocation)element.Attributes[XMakeAttributes.update];
-                ProjectErrorUtilities.ThrowInvalidProject(errorAttribute.Location, "InvalidAttributeExclusive");
+                ProjectErrorUtilities.ThrowInvalidProject(errorAttribute.GetLocation(), "InvalidAttributeExclusive");
             }
 
             // Include, remove, or update must be present unless inside a target
@@ -727,7 +727,7 @@ namespace Microsoft.Build.Construction
                 ProjectErrorUtilities.VerifyThrowInvalidProject
                 (
                 !XMakeAttributes.IsBadlyCasedSpecialTaskAttribute(attribute.Name),
-                attribute.Location,
+                attribute.GetLocation(),
                 "BadlyCasedSpecialTaskAttribute",
                 attribute.Name,
                 element.Name,

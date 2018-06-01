@@ -21,18 +21,15 @@ namespace Microsoft.Build.Construction
     /// C# doesn't currently allow covariance in method overloading, only on delegates.
     /// The caller must bravely downcast.
     /// </remarks>
-    internal class XmlElementWithLocation : XmlElement, IXmlLineInfo
+    internal class XmlElementWithLocation : XmlElement, IXmlLineInfo, IXmlLineSpanInfo
     {
-        /// <summary>
-        /// Line, column, file information
-        /// </summary>
-        private ElementLocation _elementLocation;
+        WeakReference<ElementLocation> _elementLocation = new WeakReference<ElementLocation>(null);
 
         /// <summary>
         /// Constructor without location information
         /// </summary>
         public XmlElementWithLocation(string prefix, string localName, string namespaceURI, XmlDocumentWithLocation document)
-            : this(prefix, localName, namespaceURI, document, 0, 0)
+            : base(prefix, localName, namespaceURI, document)
         {
         }
 
@@ -40,7 +37,7 @@ namespace Microsoft.Build.Construction
         /// Constructor with location information
         /// </summary>
         public XmlElementWithLocation(string prefix, string localName, string namespaceURI, XmlDocumentWithLocation document, int lineNumber, int columnNumber)
-            : base(prefix, localName, namespaceURI, document)
+            : this(prefix, localName, namespaceURI, document)
         {
             // Subtract one, just to give the same value as the old code did.
             // In the past we pointed to the column of the open angle bracket whereas the XmlTextReader points to the first character of the element name.
@@ -49,30 +46,48 @@ namespace Microsoft.Build.Construction
             XmlDocumentWithLocation documentWithLocation = (XmlDocumentWithLocation)document;
 
             int adjustedColumn = (columnNumber == 0) ? columnNumber : columnNumber - 1;
-            _elementLocation = ElementLocation.Create(documentWithLocation.FullPath, lineNumber, adjustedColumn);
+
+            this.LineNumber = lineNumber;
+            this.LinePosition = adjustedColumn;
+            this.EndLineNumber = lineNumber;
+            this.EndLinePosition = adjustedColumn;
         }
 
-        /// <summary>
-        /// Returns the line number if available, else 0.
-        /// IXmlLineInfo member.
-        /// </summary>
+        #region IXmlLineSpanInfo
+        #region IXmlLineInfo implementation
+        /// <inheritdoc />
         public int LineNumber
         {
-            [DebuggerStepThrough]
-            get
-            { return Location.Line; }
+            get;
         }
 
-        /// <summary>
-        /// Returns the column number if available, else 0.
-        /// IXmlLineInfo member.
-        /// </summary>
+        /// <inheritdoc />
         public int LinePosition
         {
-            [DebuggerStepThrough]
-            get
-            { return Location.Column; }
+            get;
         }
+
+        /// <inheritdoc />
+        public bool HasLineInfo()
+        {
+            return LineNumber != 0;
+        }
+        #endregion
+
+        /// <inheritdoc />
+        public int EndLineNumber
+        {
+            get;
+            set;
+        }
+
+        /// <inheritdoc />
+        public int EndLinePosition
+        {
+            get;
+            set;
+        }
+        #endregion
 
         /// <summary>
         /// Provides an ElementLocation for this element, using the path to the file containing
@@ -89,40 +104,22 @@ namespace Microsoft.Build.Construction
         {
             get
             {
-                // Caching the element location object saves significant memory
-                XmlDocumentWithLocation ownerDocumentWithLocation = (XmlDocumentWithLocation)OwnerDocument;
-                if (!String.Equals(_elementLocation.File, ownerDocumentWithLocation.FullPath, StringComparison.OrdinalIgnoreCase))
+                var fullPath = ((XmlDocumentWithLocation)OwnerDocument).FullPath;
+
+                if (!_elementLocation.TryGetTarget(out ElementLocation location) || !string.Equals(location.File, fullPath, StringComparison.OrdinalIgnoreCase))
                 {
-                    _elementLocation = ElementLocation.Create(ownerDocumentWithLocation.FullPath, _elementLocation.Line, _elementLocation.Column);
+                    location = ElementLocation.Create(fullPath, LineNumber, LinePosition);
+                    _elementLocation.SetTarget(location);
                 }
 
-                return _elementLocation;
+                return location;
             }
-        }
-
-        /// <summary>
-        /// Whether location is available.
-        /// IXmlLineInfo member.
-        /// </summary>
-        public bool HasLineInfo()
-        {
-            return Location.Line != 0;
         }
 
         /// <summary>
         /// Returns the XmlAttribute with the specified name or null if a matching attribute was not found.
         /// </summary>
-        public XmlAttributeWithLocation GetAttributeWithLocation(string name)
-        {
-            XmlAttribute attribute = GetAttributeNode(name);
-
-            if (attribute == null)
-            {
-                return null;
-            }
-
-            return (XmlAttributeWithLocation)attribute;
-        }
+        public XmlAttributeWithLocation GetAttributeWithLocation(string name) => (XmlAttributeWithLocation)GetAttributeNode(name);
 
         /// <summary>
         /// Overridden to convert the display of the element from open form (separate open and closed tags) to closed form 
@@ -145,11 +142,6 @@ namespace Microsoft.Build.Construction
         /// Gets the location of any attribute on this element with the specified name.
         /// If there is no such attribute, returns null.
         /// </summary>
-        internal ElementLocation GetAttributeLocation(string name)
-        {
-            XmlAttributeWithLocation attributeWithLocation = GetAttributeWithLocation(name);
-
-            return (attributeWithLocation != null) ? attributeWithLocation.Location : null;
-        }
+        internal ElementLocation GetAttributeLocation(string name) => GetAttributeWithLocation(name)?.GetLocation();
     }
 }

@@ -87,7 +87,7 @@ namespace Microsoft.Build.Internal
             ProjectErrorUtilities.VerifyThrowInvalidProject
                 (
                     attribute == null || attribute.Value.Length > 0,
-                    (attribute == null) ? null : attribute.Location,
+                    (attribute == null) ? null : attribute.GetLocation(),
                     "InvalidAttributeValue",
                     String.Empty,
                     attributeName,
@@ -156,7 +156,7 @@ namespace Microsoft.Build.Internal
         /// </summary>
         internal static void ThrowProjectInvalidAttribute(XmlAttributeWithLocation attribute)
         {
-            ProjectErrorUtilities.ThrowInvalidProject(attribute.Location, "UnrecognizedAttribute", attribute.Name, attribute.OwnerElement.Name);
+            ProjectErrorUtilities.ThrowInvalidProject(attribute.GetLocation(), "UnrecognizedAttribute", attribute.Name, attribute.OwnerElement.Name);
         }
 
         /// <summary>
