@@ -108,7 +108,7 @@ namespace Microsoft.Build.Construction
 
                 if (!_elementLocation.TryGetTarget(out ElementLocation location) || !string.Equals(location.File, fullPath, StringComparison.OrdinalIgnoreCase))
                 {
-                    location = ElementLocation.Create(fullPath, LineNumber, LinePosition);
+                    location = ElementLocation.Create(fullPath, LineNumber, LinePosition, this.EndLineNumber - LineNumber, this.EndLinePosition);
                     _elementLocation.SetTarget(location);
                 }
 

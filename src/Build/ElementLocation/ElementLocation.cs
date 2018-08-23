@@ -188,11 +188,16 @@ namespace Microsoft.Build.Construction
         /// In AG there are 600 locations that have a file but zero line and column.
         /// In theory yet another derived class could be made for these to save 4 bytes each.
         /// </remarks>
-        internal static ElementLocation Create(string file, int line, int column)
+        internal static ElementLocation Create(string file, int line, int column, int countLines = 0, int endColumn = 0)
         {
             if (string.IsNullOrEmpty(file) && line == 0 && column == 0)
             {
                 return EmptyLocation;
+            }
+
+            if (countLines > 0 || endColumn != 0)
+            {
+                return new ElementLocation.SpanElementLocation(file, line, column, countLines, endColumn);
             }
 
             if (line <= 65535 && column <= 65535)
@@ -373,6 +378,83 @@ namespace Microsoft.Build.Construction
             public override int Column
             {
                 get { return (int)column; }
+            }
+        }
+
+        /// <summary>
+        /// Span location
+        /// </summary>
+        private class SpanElementLocation : ElementLocation
+        {
+            private readonly int countLines;
+
+            /// <summary>
+            /// Constructor for the case where we have most or all information.
+            /// Numerical values must be 1-based, non-negative; 0 indicates unknown
+            /// File may be null or empty, indicating the file was not loaded from disk.
+            /// </summary>
+            internal SpanElementLocation(string file, int line, int column, int nLines, int endColumn)
+            {
+                ErrorUtilities.VerifyThrow(line > -1 && column > -1, "Use zero for unknown");
+
+                ErrorUtilities.VerifyThrow((nLines > 0) || (nLines == 0 && endColumn >= column), "endColumn must be greater than start column");
+
+                this.File = file ?? String.Empty;
+                this.Line = line;
+                this.Column = column;
+                this.countLines = nLines;
+                this.EndColumn = endColumn;
+            }
+
+            /// <summary>
+            /// The file from which this particular element originated.  It may
+            /// differ from the ProjectFile if, for instance, it was part of
+            /// an import or originated in a targets file.
+            /// If not known, returns empty string.
+            /// </summary>
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            public override string File
+            {
+                get;
+            }
+
+            /// <summary>
+            /// The line number where this element exists in its file.
+            /// The first line is numbered 1.
+            /// Zero indicates "unknown location".
+            /// </summary>
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            public override int Line
+            {
+                get;
+            }
+
+            /// <summary>
+            /// The column number where this element exists in its file.
+            /// The first column is numbered 1.
+            /// Zero indicates "unknown location".
+            /// </summary>
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            public override int Column
+            {
+                get;
+            }
+
+            /// <summary>
+            /// The number of lines comprising the element.
+            /// </summary>
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            public int EndLine => this.Line + this.countLines;
+
+            /// <summary>
+            /// The column number where this element exists in its file.
+            /// The first column is numbered 1.
+            /// Zero indicates "unknown location".
+            /// </summary>
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            public int EndColumn
+            {
+                get;
             }
         }
     }
